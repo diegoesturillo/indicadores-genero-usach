@@ -1,11 +1,7 @@
 
 # Indicadores de Género USACH
 
-<!-- badges: start -->
-<!-- badges: end -->
-
-## In this repository, you will find the data used to elaborate the gender indicators dashboard
-of the University of Santiago de Chile (USACH).
+## In this repository, you will find the data used to elaborate the gender indicators dashboard of the University of Santiago de Chile (USACH).
 - This platform was developed to offer a clear and accessible visualization of gender indicators in the USACH community. 
 Below are some guidelines and methodological criteria that guided the construction of the included graphs
 - The information presented here corresponds to the 2018–2024 period. However, for some years, complete information is not available.
