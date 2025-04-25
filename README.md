@@ -10,5 +10,5 @@ Below are some guidelines and methodological criteria that guided the constructi
 They were also compared with official data from the Higher Education Information Service (SIES, in spanish) of the Ministry of Education (MINEDUC, in spanish).
 - The graphs were created using interactive tools, allowing for further exploration by the user. 
 - All information has been anonymized and is presented for analytical purposes only.
-- This project is under GNU GLP v3 License. Reproduction and replication of the results is permitted. The code may be modified by citing the original source.
+- This project is under GNU GPL v3 license. Reproduction and replication of the results is permitted. The code may be modified by citing the original source.
 - Any other analysis  must be cited based on the work of the Observatorio de Género y Diversidad (OGD).
