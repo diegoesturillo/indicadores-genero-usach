@@ -2,7 +2,7 @@
 # Indicadores de Género USACH
 
 ## In this repository, you will find the data used to elaborate the gender indicators dashboard of the University of Santiago de Chile (USACH).
--This project follows the IPO (input-processing-output) protocol for reproducible research workflow. For more information, please visit: https://lisa-coes.netlify.app/ipo-repro/
+- This project follows the IPO (input-processing-output) protocol for reproducible research workflow. For more information, please visit: https://lisa-coes.netlify.app/ipo-repro/
 - This platform was developed to offer a clear and accessible visualization of gender indicators in the USACH community. 
 Below are some guidelines and methodological criteria that guided the construction of the included graphs
 - The information presented here corresponds to the 2018–2024 period. However, for some years, complete information is not available.
