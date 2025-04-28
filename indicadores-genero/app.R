@@ -1,8 +1,8 @@
 # Preparación plataforma de visualización indicadores de género USACH 2018-2024
 # Cargar paquetes
-pacman::p_load(here, plotly, scales, shiny, shinythemes, tidyverse)
+pacman::p_load(here, ggrepel, plotly, purrr, readxl, rio, scales, shiny, shinythemes, tidyverse)
 
-source(here("indicadores-genero/graficos_plotly.R"))
+source("graficos_plotly_app.R")
 
 ui <- navbarPage(
   id = "tabs",
@@ -90,7 +90,8 @@ ui <- navbarPage(
                h1(class = "welcome-title", "Bienvenid-s al Panel de Indicadores de Género de la USACH"),
                p(class = "welcome-subtitle", "Visualización de indicadores clave de la participación de mujeres en la comunidad universitaria"),
                tags$a(href = "https://github.com/diegoesturillo/indicadores-genero-usach", target = "_blank",
-                      tags$img(src = "usach-p1.png", height = "160px", style = "margin-top: 50px;")
+                      tags$img(src = "usach-p1.png", height = "200px", style = "margin-top: 50px;",
+                               style = "margin-bottom: 20px; cursor: pointer;")
                ),
                br(),
                br(),
@@ -253,7 +254,7 @@ ui <- navbarPage(
            )
   ),
   
-  tabPanel("Matrícula por área de conocimiento",
+  tabPanel("Matrícula por área del conocimiento",
            fluidPage(
              div(
                style = "background-color: #f0f0f0;
@@ -265,7 +266,7 @@ ui <- navbarPage(
                       font-size: 16px;
                       color: #333;
                       box-shadow: 2px 2px 8px rgba(0,0,0,0.1);",
-               "En esta sección se puede comparar la matrícula estudiantil total, de 1er año y la tasa de retención por género en distintas áreas del conocimiento genéricas."
+               "En esta sección se puede comparar la matrícula estudiantil total, de 1er año y la tasa de retención por género y área del conocimiento genérica."
              ),
              fluidRow(
                column(6, plotlyOutput("plot_mat_area")),
@@ -278,7 +279,7 @@ ui <- navbarPage(
            )
   ),
   
-  tabPanel("Titulados por género y área de conocimiento",
+  tabPanel("Titulados por género y área del conocimiento",
            fluidPage(
              div(
                style = "background-color: #f0f0f0;
@@ -290,7 +291,7 @@ ui <- navbarPage(
                       font-size: 16px;
                       color: #333;
                       box-shadow: 2px 2px 8px rgba(0,0,0,0.1);",
-               "En esta sección se pueden ver la distribución de estudiantes titulados/as por género y por área de conocimiento genérica."
+               "En esta sección se pueden ver la distribución de estudiantes titulados/as por género y área del conocimiento genérica."
              ),
              fluidRow(
                column(6, plotlyOutput("plot_titulados")),
@@ -320,10 +321,10 @@ server <- function(input, output, session) {
     updateTabsetPanel(session, "tabs", selected = "Matrícula por género")
   })
   observeEvent(input$go_area, {
-    updateTabsetPanel(session, "tabs", selected = "Matrícula por área de conocimiento")
+    updateTabsetPanel(session, "tabs", selected = "Matrícula por área del conocimiento")
   })
   observeEvent(input$go_titulados, {
-    updateTabsetPanel(session, "tabs", selected = "Titulados por género y área de conocimiento")
+    updateTabsetPanel(session, "tabs", selected = "Titulados por género y área del conocimiento")
   })
   
   # Plots
