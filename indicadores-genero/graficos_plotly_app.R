@@ -1,6 +1,6 @@
 # Gráficos en formato plotly
 # Carga de paquetes
-pacman::p_load(here, ggrepel, plotly, purrr, readxl, rio, scales, tidyverse)
+pacman::p_load(here, ggrepel, plotly, purrr, RColorBrewer, readxl, rio, scales, tidyverse, viridis)
 
 # Gráfico 1. Cantidad de académicos por género en la USACH (2018-2024)----
 # Cargar datos
@@ -45,7 +45,7 @@ plot_acad_genero <- plot_ly(
   marker = list(size = 6)) %>%
   layout(
     title = list(
-      text = "<b>Académicos por género (2018-2024)</b>",
+      text = "<b>Estamento académico por género (2018-2024)</b>",
       font = list(size = 14),
       x = 0.5
     ),
@@ -66,89 +66,142 @@ plot_acad_genero
 # Cargar datos
 acad_grados <- read_excel(here("01-input", "data-orig","CONSOLIDADO EMA 2018-2024_USACH.xlsx"))
 
-# Preparar datos
-academicos_grados <- acad_grados %>%
-  transmute(
-    año,
-    `Doctorado Mujer` = n_acad_doc_f,
-    `Doctorado Hombre` = n_acad_doc_m,
-    `Magíster Mujer` = n_acad_mg_f,
-    `Magíster Hombre` = n_acad_mg_m,
-    `Licenciatura Mujer` = n_acad_lic_f,
-    `Licenciatura Hombre` = n_acad_lic_m,
-    prop_doc_f = round(n_acad_doc_f/n_acad_doc*100, 0),
-    prop_doc_m = round(n_acad_doc_m/n_acad_doc*100, 0),
-    prop_mg_f = round(n_acad_mg_f/n_acad_mg*100, 0),
-    prop_mg_m = round(n_acad_mg_m/n_acad_mg*100, 0),
-    prop_lic_f = round(n_acad_lic_f/n_acad_lic*100, 0),
-    prop_lic_m = round(n_acad_lic_m/n_acad_lic*100, 0)) %>%
+# Preparar datos - grado doctorado----
+acad_grado_doc <- acad_grados %>%
+  select(año, n_acad_doc_f, n_acad_doc_m)%>%
   pivot_longer(
-    cols = starts_with(c("Doctorado", "Magíster", "Licenciatura")),
-    names_to = "grupo",
-    values_to = "n") %>%
+    cols = c(n_acad_doc_f, n_acad_doc_m),
+    names_to = "genero",
+    values_to = "cantidad") %>%
   mutate(
-    genero = if_else(str_detect(grupo, "Mujer"), "Mujer", "Hombre"),
-    grado = case_when(
-      str_detect(grupo, "Doctorado") ~ "Doctorado",
-      str_detect(grupo, "Magíster") ~ "Magíster",
-      str_detect(grupo, "Licenciatura") ~ "Licenciatura"),
-    prop = case_when(
-      grupo == "Doctorado Mujer" ~ prop_doc_f,
-      grupo == "Doctorado Hombre" ~ prop_doc_m,
-      grupo == "Magíster Mujer" ~ prop_mg_f,
-      grupo == "Magíster Hombre" ~ prop_mg_m,
-      grupo == "Licenciatura Mujer" ~ prop_lic_f,
-      grupo == "Licenciatura Hombre" ~ prop_lic_m),
-    text = paste0(
-      "Año: ", año, "<br>",
-      "Grado: ", grado, "<br>",
-      "Género: ", genero, "<br>",
-      "Cantidad: ", n, "<br>",
-      "Proporción: ", prop, "%"))
+    genero = recode(genero,
+                    "n_acad_doc_f" = "Femenino",
+                    "n_acad_doc_m" = "Masculino")) %>%
+  group_by(año) %>%
+  mutate(total_anual = sum(cantidad, na.rm = T),
+         proporcion = round((cantidad/total_anual)*100, 0)) %>%
+  ungroup()
 
-# Ordenar factor de grado
-academicos_grados$grado <- factor(
-  academicos_grados$grado,
-  levels = c("Doctorado", "Magíster", "Licenciatura"))
-academicos_grados$grupo<- factor(
-  academicos_grados$grupo,
-  levels = c("Doctorado Mujer","Doctorado Hombre",
-             "Magíster Mujer", "Magíster Hombre", 
-             "Licenciatura Mujer", "Licenciatura Hombre"))
-
-# Colores
-colores <- c(
-  "Doctorado Mujer" = "#8D69F3",
-  "Doctorado Hombre" = "#41776E",
-  "Magíster Mujer" = "#BDA6FF",
-  "Magíster Hombre" = "#8AC0B5",
-  "Licenciatura Mujer" = "#D1C5FA",
-  "Licenciatura Hombre" = "#A9D6CD")
-
-# Gráfico con facet
-p_facet <- ggplot(academicos_grados, aes(x = año, y = n, color = grupo, text = text, group = grupo)) +
-  geom_line(linewidth = 1) +
-  geom_point(size = 2) +
-  facet_wrap(~grado, ncol = 1, strip.position = "top", scales = "free_y") +
-  scale_color_manual(values = colores) +
-  labs(x = "", y = "", color = "") +
-  theme_minimal(base_size = 12) +
-  theme(
-    legend.position = "right",
-    strip.text = element_text(size = 12, face = "bold"),
-    strip.placement = "outside")
-
-plot_acad_grado <- ggplotly(p_facet, tooltip = "text") %>%
+# Graficar
+plot_acad_grado_doc <- plot_ly(
+  data = acad_grado_doc,
+  x = ~año,
+  y = ~cantidad,
+  color = ~genero,
+  colors = c("Femenino" = "#8D69F3", "Masculino" = "#41776E"),
+  type = 'scatter',
+  mode = 'lines+markers',
+  text = ~paste("<b>Año:</b> ", año, "<br>",
+                "<b>Género:</b> ", genero, "<br>",
+                "<b>Cantidad:</b> ", cantidad, "<br>",
+                "<b>Proporción:</b> ", proporcion, "%"),
+  hoverinfo = 'text'
+) %>%
   layout(
     title = list(
-      text = "<b>Académicos por género y grado académico (2018-2024)</b>",
+      text = "<b>Estamento académico por género y grado doctorado (2018-2024)</b>",
       font = list(size = 14),
       x = 0.5),
-    legend = list(title = list(text = "<b>Grado y género</b>")),
-    margin = list(t = 80))
+    xaxis = list(title = "", tickvals = 2018:2024),
+    yaxis = list(title = ""),
+    legend = list(title = list(text = "<b>Género</b>")),
+    margin = list(t = 80),
+    hovermode = "closest"
+  )
 
-plot_acad_grado
+plot_acad_grado_doc
 
+# Preparar datos - grado magíster----
+acad_grado_mg <- acad_grados %>%
+  select(año, n_acad_mg_f, n_acad_mg_m)%>%
+  pivot_longer(
+    cols = c(n_acad_mg_f, n_acad_mg_m),
+    names_to = "genero",
+    values_to = "cantidad") %>%
+  mutate(
+    genero = recode(genero,
+                    "n_acad_mg_f" = "Femenino",
+                    "n_acad_mg_m" = "Masculino")) %>%
+  group_by(año) %>%
+  mutate(total_anual = sum(cantidad, na.rm = T),
+         proporcion = round((cantidad/total_anual)*100, 0)) %>%
+  ungroup()
+
+# Graficar
+plot_acad_grado_mg <- plot_ly(
+  data = acad_grado_mg,
+  x = ~año,
+  y = ~cantidad,
+  color = ~genero,
+  colors = c("Femenino" = "#8D69F3", "Masculino" = "#41776E"),
+  type = 'scatter',
+  mode = 'lines+markers',
+  text = ~paste("<b>Año:</b> ", año, "<br>",
+                "<b>Género:</b> ", genero, "<br>",
+                "<b>Cantidad:</b> ", cantidad, "<br>",
+                "<b>Proporción:</b> ", proporcion, "%"),
+  hoverinfo = 'text'
+) %>%
+  layout(
+    title = list(
+      text = "<b>Estamento académico por género y grado magíster (2018-2024)</b>",
+      font = list(size = 14),
+      x = 0.5),
+    xaxis = list(title = "", tickvals = 2018:2024),
+    yaxis = list(title = ""),
+    legend = list(title = list(text = "<b>Género</b>")),
+    margin = list(t = 80),
+    hovermode = "closest"
+  )
+
+plot_acad_grado_mg
+
+# Preparar datos - grado licenciado----
+acad_grado_lic <- acad_grados %>%
+  select(año, n_acad_lic_f, n_acad_lic_m)%>%
+  pivot_longer(
+    cols = c(n_acad_lic_f, n_acad_lic_m),
+    names_to = "genero",
+    values_to = "cantidad") %>%
+  mutate(
+    genero = recode(genero,
+                    "n_acad_lic_f" = "Femenino",
+                    "n_acad_lic_m" = "Masculino")) %>%
+  group_by(año) %>%
+  mutate(total_anual = sum(cantidad, na.rm = T),
+         proporcion = round((cantidad/total_anual)*100, 0)) %>%
+  ungroup()
+
+# Graficar
+plot_acad_grado_lic <- plot_ly(
+  data = acad_grado_lic,
+  x = ~año,
+  y = ~cantidad,
+  color = ~genero,
+  colors = c("Femenino" = "#8D69F3", "Masculino" = "#41776E"),
+  type = 'scatter',
+  mode = 'lines+markers',
+  text = ~paste("<b>Año:</b> ", año, "<br>",
+                "<b>Género:</b> ", genero, "<br>",
+                "<b>Cantidad:</b> ", cantidad, "<br>",
+                "<b>Proporción:</b> ", proporcion, "%"),
+  hoverinfo = 'text'
+) %>%
+  layout(
+    title = list(
+      text = "<b>Estamento académico por género y grado licenciatura (2018-2024)</b>",
+      font = list(size = 14),
+      x = 0.5),
+    xaxis = list(title = "", tickvals = 2018:2024),
+    yaxis = list(title = "", rangemode = "tozero"),
+    legend = list(title = list(text = "<b>Género</b>")),
+    margin = list(t = 80),
+    hovermode = "closest"
+  )
+
+plot_acad_grado_lic
+
+#///////////////////////////////////////////////////////////////////////////////
 # Gráfico 3. Académicos por género y jerarquía - 3 jerarquías----
 # Carga de datos
 ema_jq <- read_excel(here("01-input", "data-orig", "CONSOLIDADO EMA 2018-2024_USACH.xlsx"), 
@@ -178,10 +231,10 @@ academicos_jerarquia <- ema_jq %>%
       T ~ "total")) %>%
   group_by(año, jerarquia) %>%
   mutate(
-    total_jerarquia = sum(valor[tipo=="detalle"], na.rm = T),
+    total_jerarquia = sum(valor[tipo == "detalle"], na.rm = T),
     proporcion = round((valor/total_jerarquia)*100, 0)) %>%
   ungroup() %>%
-  filter(tipo=="detalle") %>%
+  filter(tipo == "detalle") %>%
   rename(cantidad = valor) %>%
   select(año, genero, jerarquia, cantidad, proporcion) %>%
   mutate(
@@ -207,11 +260,11 @@ plot_jerarquias <- academicos_jerarquia %>%
     mode = 'lines+markers',
     colors = c(
       "Titular Mujeres" = "#6A5ACD",
-      "Titular Hombres" = "#3C8DAD",
-      "Asociado/a Mujeres" = "#9370DB",
-      "Asociado/a Hombres" = "#6495ED",
-      "Asistente Mujeres" = "#D8BFD8",
-      "Asistente Hombres" = "#87CEEB"),
+      "Titular Hombres" = "#41776E",
+      "Asociado/a Mujeres" = "#A07DF5",
+      "Asociado/a Hombres" = "#5C918A",
+      "Asistente Mujeres" = "#B598F7",
+      "Asistente Hombres" = "#76ACA4"),
     text = ~paste0(
       "<b>Año:</b> ", año, "<br>",
       "<b>Jerarquía:</b> ", jerarquia, "<br>",
@@ -221,7 +274,7 @@ plot_jerarquias <- academicos_jerarquia %>%
     hoverinfo = 'text') %>%
   layout(
     title = list(
-      text = "<b>Académicos por género y jerarquía (1) (2018-2024)</b>",
+      text = "<b>Estamento académico por género y jerarquía (2018-2024)</b>",
       font = list(size = 14),
       x = 0.5),
     xaxis = list(title = "", tickvals = 2018:2024),
@@ -293,12 +346,12 @@ plot_jerarquias_2 <- academicos_jerarquia_2 %>%
     type = 'scatter',
     mode = 'lines+markers',
     colors = c(
-      "Instructor/a Mujeres" = "#A291FB",
-      "Instructor/a Hombres" = "#4B5DFF",
-      "Adjunto/a Mujeres" = "#B3C7F9",
-      "Adjunto/a Hombres" = "#2D76F3",
-      "Sin jerarquía Mujeres" = "#C8D8FF",
-      "Sin jerarquía Hombres" = "#4472CA"),
+      "Instructor/a Mujeres" = "#6A5ACD",
+      "Instructor/a Hombres" = "#41776E",
+      "Adjunto/a Mujeres" = "#A07DF5",
+      "Adjunto/a Hombres" = "#5C918A",
+      "Sin jerarquía Mujeres" = "#B598F7",
+      "Sin jerarquía Hombres" = "#76ACA4"),
     text = ~paste0(
       "<b>Año:</b> ", año, "<br>",
       "<b>Jerarquía:</b> ", jerarquia, "<br>",
@@ -308,7 +361,7 @@ plot_jerarquias_2 <- academicos_jerarquia_2 %>%
     hoverinfo = 'text') %>%
   layout(
     title = list(
-      text = "<b>Académicos por género y jerarquía (2) (2018-2023)</b>",
+      text = "<b>Estamento académico por género y jerarquía (2018-2023)</b>",
       font = list(size = 14),
       x = 0.5),
     xaxis = list(title = "", tickvals = 2018:2024),
@@ -363,12 +416,192 @@ plot_pub <- acad_pub %>%
       font = list(size = 14),
       x = 0.5),
     xaxis = list(title = "", tickvals = 2018:2024),
-    yaxis = list(title = "", range = c(0, 1800), dtick = 200),
+    yaxis = list(title = ""),
     legend = list(title = list(text = "<b>Género</b>")),
     margin = list(t = 80),
     hovermode = "closest")
 
 plot_pub
+
+# Preparar datos - indexación en WOS----
+wos_pub <- ema_pub %>%
+  mutate(
+    prop_f = round(n_pub_wos_f/n_pub_wos*100,0),
+    prop_m = round(n_pub_wos_m/n_pub_wos*100,0)) %>%
+  pivot_longer(
+    cols = c(n_pub_wos_f, n_pub_wos_m),
+    names_to = "genero",
+    values_to = "cantidad") %>%
+  mutate(
+    genero = recode(genero,
+                    "n_pub_wos_f" = "Femenino",
+                    "n_pub_wos_m" = "Masculino"),
+    proporcion = case_when(
+      genero == "Femenino" ~ prop_f,
+      genero == "Masculino" ~ prop_m))
+
+# Graficar
+plot_pub_wos <- wos_pub %>%
+  plot_ly(
+    x = ~año,
+    y = ~cantidad,
+    color = ~genero,
+    type = 'scatter',
+    mode = 'lines+markers',
+    colors = c("Femenino" = "#8D69F3", "Masculino" = "#41776E"),
+    text = text ~paste0(
+      "<b>Año:</b> ", año, "<br>",
+      "<b>Género:</b> ", genero, "<br>",
+      "<b>Publicaciones:</b> ", cantidad, "<br>",
+      "<b>Proporción:</b> ", proporcion, "%"),
+    hoverinfo = 'text') %>%
+  layout(
+    title = list(
+      text = "<b>Publicaciones en revistas indexadas por género en WOS (2019-2024)</b>",
+      font = list(size = 14),
+      x = 0.5),
+    xaxis = list(title = "", tickvals = 2019:2024),
+    yaxis = list(title = ""),
+    legend = list(title = list(text = "<b>Género</b>")),
+    margin = list(t = 80),
+    hovermode = "closest")
+
+plot_pub_wos
+
+# Preparar datos - indexación en Scopus----
+scopus_pub <- ema_pub %>%
+  mutate(
+    prop_f = round(n_pub_scopus_f/n_pub_scopus*100,0),
+    prop_m = round(n_pub_scopus_m/n_pub_scopus*100,0)) %>%
+  pivot_longer(
+    cols = c(n_pub_scopus_f, n_pub_scopus_m),
+    names_to = "genero",
+    values_to = "cantidad") %>%
+  mutate(
+    genero = recode(genero,
+                    "n_pub_scopus_f" = "Femenino",
+                    "n_pub_scopus_m" = "Masculino"),
+    proporcion = case_when(
+      genero == "Femenino" ~ prop_f,
+      genero == "Masculino" ~ prop_m))
+
+# Graficar
+plot_pub_scopus <- scopus_pub %>%
+  plot_ly(
+    x = ~año,
+    y = ~cantidad,
+    color = ~genero,
+    type = 'scatter',
+    mode = 'lines+markers',
+    colors = c("Femenino" = "#8D69F3", "Masculino" = "#41776E"),
+    text = text ~paste0(
+      "<b>Año:</b> ", año, "<br>",
+      "<b>Género:</b> ", genero, "<br>",
+      "<b>Publicaciones:</b> ", cantidad, "<br>",
+      "<b>Proporción:</b> ", proporcion, "%"),
+    hoverinfo = 'text') %>%
+  layout(
+    title = list(
+      text = "<b>Publicaciones en revistas indexadas por género en Scopus (2019-2024)</b>",
+      font = list(size = 14),
+      x = 0.5),
+    xaxis = list(title = "", tickvals = 2019:2024),
+    yaxis = list(title = ""),
+    legend = list(title = list(text = "<b>Género</b>")),
+    margin = list(t = 80),
+    hovermode = "closest")
+
+plot_pub_scopus
+
+# Preparar datos - indexación en Scielo----
+scielo_pub <- ema_pub %>%
+  mutate(
+    prop_f = round(n_pub_scielo_f/n_pub_scielo*100,0),
+    prop_m = round(n_pub_scielo_m/n_pub_scielo*100,0)) %>%
+  pivot_longer(
+    cols = c(n_pub_scielo_f, n_pub_scielo_m),
+    names_to = "genero",
+    values_to = "cantidad") %>%
+  mutate(
+    genero = recode(genero,
+                    "n_pub_scielo_f" = "Femenino",
+                    "n_pub_scielo_m" = "Masculino"),
+    proporcion = case_when(
+      genero == "Femenino" ~ prop_f,
+      genero == "Masculino" ~ prop_m))
+
+# Graficar
+plot_pub_scielo <- scielo_pub %>%
+  plot_ly(
+    x = ~año,
+    y = ~cantidad,
+    color = ~genero,
+    type = 'scatter',
+    mode = 'lines+markers',
+    colors = c("Femenino" = "#8D69F3", "Masculino" = "#41776E"),
+    text = text ~paste0(
+      "<b>Año:</b> ", año, "<br>",
+      "<b>Género:</b> ", genero, "<br>",
+      "<b>Publicaciones:</b> ", cantidad, "<br>",
+      "<b>Proporción:</b> ", proporcion, "%"),
+    hoverinfo = 'text') %>%
+  layout(
+    title = list(
+      text = "<b>Publicaciones en revistas indexadas por género en Scielo (2019-2024)</b>",
+      font = list(size = 14),
+      x = 0.5),
+    xaxis = list(title = "", tickvals = 2019:2024),
+    yaxis = list(title = ""),
+    legend = list(title = list(text = "<b>Género</b>")),
+    margin = list(t = 80),
+    hovermode = "closest")
+
+plot_pub_scielo
+
+# Preparar datos - indexación en otras bases----
+otras_pub <- ema_pub %>%
+  mutate(
+    prop_f = round(n_pub_otras_f/n_pub_otras*100,0),
+    prop_m = round(n_pub_otras_m/n_pub_otras*100,0)) %>%
+  pivot_longer(
+    cols = c(n_pub_otras_f, n_pub_otras_m),
+    names_to = "genero",
+    values_to = "cantidad") %>%
+  mutate(
+    genero = recode(genero,
+                    "n_pub_otras_f" = "Femenino",
+                    "n_pub_otras_m" = "Masculino"),
+    proporcion = case_when(
+      genero == "Femenino" ~ prop_f,
+      genero == "Masculino" ~ prop_m))
+
+# Graficar
+plot_pub_otras <- otras_pub %>%
+  plot_ly(
+    x = ~año,
+    y = ~cantidad,
+    color = ~genero,
+    type = 'scatter',
+    mode = 'lines+markers',
+    colors = c("Femenino" = "#8D69F3", "Masculino" = "#41776E"),
+    text = text ~paste0(
+      "<b>Año:</b> ", año, "<br>",
+      "<b>Género:</b> ", genero, "<br>",
+      "<b>Publicaciones:</b> ", cantidad, "<br>",
+      "<b>Proporción:</b> ", proporcion, "%"),
+    hoverinfo = 'text') %>%
+  layout(
+    title = list(
+      text = "<b>Publicaciones en revistas indexadas por género en otras bases de datos (2019-2024)</b>",
+      font = list(size = 14),
+      x = 0.5),
+    xaxis = list(title = "", tickvals = 2019:2024),
+    yaxis = list(title = ""),
+    legend = list(title = list(text = "<b>Género</b>")),
+    margin = list(t = 80),
+    hovermode = "closest")
+
+plot_pub_otras
 
 #///////////////////////////////////////////////////////////////////////////////
 # Gráfico 6. Puestos directivos por género - 2 posiciones----
@@ -409,24 +642,28 @@ plot_puestos_1
 
 # Separar en dos subplots, uno por puesto
 puestos_split_1 <- split(ema_puestos_1, ema_puestos_1$puesto)
-
-subplots_1 <- lapply(puestos_split_1, function(df) {
-  plot_ly(
-    data = df,
-    x = ~año,
-    y = ~cantidad,
-    color = ~genero,
-    type = 'scatter',
-    mode = 'lines+markers',
-    colors = c("Femenino" = "#8D69F3", "Masculino" = "#41776E"),
-    text = ~paste0(
-      "<b>Año:</b> ", año, "<br>",
-      "<b>Puesto:</b> ", puesto, "<br>",
-      "<b>Género:</b> ", genero, "<br>",
-      "<b>Cantidad:</b> ", cantidad, "<br>",
-      "<b>Proporción:</b> ", prop, "%"),
-    hoverinfo = 'text',
-    showlegend = FALSE)})
+subplots_1 <- list(
+  "Junta Directiva" = puestos_split_1[["Junta Directiva"]],
+  "Consejo Académico" = puestos_split_1[["Consejo Académico"]]
+) %>%
+  lapply(function(df) {
+    plot_ly(
+      data = df,
+      x = ~año,
+      y = ~cantidad,
+      color = ~genero,
+      type = 'scatter',
+      mode = 'lines+markers',
+      colors = c("Femenino" = "#8D69F3", "Masculino" = "#41776E"),
+      text = ~paste0(
+        "<b>Año:</b> ", año, "<br>",
+        "<b>Puesto:</b> ", puesto, "<br>",
+        "<b>Género:</b> ", genero, "<br>",
+        "<b>Cantidad:</b> ", cantidad, "<br>",
+        "<b>Proporción:</b> ", prop, "%"),
+      hoverinfo = 'text',
+      showlegend = F)
+  })
 
 # Combinar subplots
 plot_jd_ca <- subplot(subplots_1, nrows = 2, shareX = T, shareY = T, titleY = T) %>%
@@ -733,6 +970,7 @@ plot_mat_area <- ema_mat_area %>%
     x = ~año,
     y = ~mt,
     color = ~area_del_conocimiento,
+    colors = rainbow(length(unique(ema_mat_area$area_del_conocimiento))),
     type = 'scatter',
     mode = 'lines+markers',
     text = ~paste0(
@@ -748,7 +986,6 @@ plot_mat_area <- ema_mat_area %>%
     xaxis = list(title = "", tickvals = 2018:2024, tickangle = 0),
     yaxis = list(
       title = "",
-      tickvals = seq(0, 11000, 1000),
       tickformat = ".0f",
       separatethousands = T),
     legend = list(title = list(text = "<b>Área del conocimiento</b>")),
@@ -765,6 +1002,7 @@ plot_mat_area_1 <- ema_mat_area %>%
     x = ~año,
     y = ~m1,
     color = ~area_del_conocimiento,
+    colors = colorRampPalette(brewer.pal(9, "Set1"))(9),
     type = 'scatter',
     mode = 'lines+markers',
     text = ~paste0(
@@ -891,7 +1129,7 @@ titulados_g <- titulados_g %>%
   group_by(anio) %>%
   mutate(
     total_anual = sum(cantidad),
-    proporcion = round((cantidad / total_anual)*100, 0)) %>%
+    proporcion = round((cantidad/total_anual)*100, 0)) %>%
   ungroup()
 
 # Graficar
@@ -906,11 +1144,11 @@ plot_titulados <- titulados_g %>%
     text = ~paste0(
       "<b>Año:</b> ", anio, "<br>",
       "<b>Género:</b> ", genero, "<br>",
-      "<b>Matrícula:</b> ", label_comma(big.mark = ".", decimal.mark = ",")(cantidad), "<br>",
+      "<b>Titulados:</b> ", label_comma(big.mark = ".", decimal.mark = ",")(cantidad), "<br>",
       "<b>Proporción:</b> ", proporcion, "%"),
     hoverinfo = 'text') %>%
   layout(title = list(
-    text = "<b>Titulados de pregrado por género (2018-2023)</b>",
+    text = "<b>Titulación de pregrado por género (2018-2023)</b>",
     font = list(size = 14),
     x = 0.5),
     xaxis = list(title = "", tickvals = 2018:2023),
@@ -936,6 +1174,7 @@ plot_titulados_area <- titulados_ac %>%
     x = ~anio,
     y = ~total_titulados,
     color = ~area_del_conocimiento,
+    colors = colorRampPalette(brewer.pal(8, "Accent"))(8),
     type = 'scatter',
     mode = 'lines+markers',
     text = ~paste0(
@@ -947,7 +1186,7 @@ plot_titulados_area <- titulados_ac %>%
     hoverinfo = 'text'
   ) %>%
   layout(title = list(
-    text = "<b>Titulados por área de conocimiento (2018-2023)</b>",
+    text = "<b>Titulación de pregrado por área de conocimiento (2018-2023)</b>",
     font = list(size = 14),
     x = 0.5),
     xaxis = list(title = "", tickvals = 2018:2023, tickangle = 0),
@@ -963,3 +1202,454 @@ plot_titulados_area <- titulados_ac %>%
     margin = list(t = 50))
 
 plot_titulados_area
+
+#///////////////////////////////////////////////////////////////////////////////
+# Gráfico 17. Titulados administración por género y total 2018-2023----
+# Filtar datos
+titulados_ac_1 <- titulados_ac %>%
+  filter(area_del_conocimiento=="Administración y Comercio")
+
+plot_titulados_ayc <- plot_ly(titulados_ac_1, x = ~anio) %>%
+  add_bars(
+    y = ~titulados_mujeres,
+    name = "Femenino",
+    marker = list(color = "#8D69F3"),
+    hovertext = ~paste("Año:", anio, "<br>Femenino:", titulados_mujeres,
+                       "<br>Proporción:", prop_fem, "%"),
+    hoverinfo = "text"
+  ) %>%
+  add_bars(
+    y = ~titulados_hombres,
+    name = "Masculino",
+    marker = list(color = "#41776E"),
+    hovertext = ~paste("Año:", anio, "<br>Masculino:", titulados_hombres,
+                       "<br>Proporción:", prop_mas, "%"),
+    hoverinfo = "text"
+  ) %>%
+  add_trace(
+    y = ~total_titulados,
+    name = "Total",
+    type = "scatter",
+    mode = "lines+markers",
+    line = list(color = "black", width = 3),
+    marker = list(color = "black", size = 6),
+    hovertext = ~paste("Año:", anio, "<br>Total:", total_titulados),
+    hoverinfo = "text"
+  ) %>%
+  layout(
+    title = list(
+      text = "<b>Titulación de pregrado por género - Administración y Comercio (2018-2023)</b>",
+      font = list(size = 13),
+      x = 0.5
+    ),
+    barmode = 'group',
+    xaxis = list(title = "", tickvals = 2018:2023),
+    yaxis = list(
+      title = ""),
+    separators = ".", 
+    legend = list(title = list(text = "<b>Género<br>")),
+    margin = list(t = 50),
+    hovermode = "closest"
+  )
+
+plot_titulados_ayc
+
+#///////////////////////////////////////////////////////////////////////////////
+# Gráfico 18. Titulados arte y arquitectura por género y total 2018-2023----
+titulados_ac_2 <- titulados_ac %>%
+  filter(area_del_conocimiento=="Arte y Arquitectura")
+
+plot_titulados_aya <- plot_ly(titulados_ac_2, x = ~anio) %>%
+  add_bars(
+    y = ~titulados_mujeres,
+    name = "Femenino",
+    marker = list(color = "#8D69F3"),
+    hovertext = ~paste("Año:", anio, "<br>Femenino:", titulados_mujeres,
+                       "<br>Proporción:", prop_fem, "%"),
+    hoverinfo = "text"
+  ) %>%
+  add_bars(
+    y = ~titulados_hombres,
+    name = "Masculino",
+    marker = list(color = "#41776E"),
+    hovertext = ~paste("Año:", anio, "<br>Masculino:", titulados_hombres,
+                       "<br>Proporción:", prop_mas, "%"),
+    hoverinfo = "text"
+  ) %>%
+  add_trace(
+    y = ~total_titulados,
+    name = "Total",
+    type = "scatter",
+    mode = "lines+markers",
+    line = list(color = "black", width = 3),
+    marker = list(color = "black", size = 6),
+    hovertext = ~paste("Año:", anio, "<br>Total:", total_titulados),
+    hoverinfo = "text"
+  ) %>%
+  layout(
+    title = list(
+      text = "<b>Titulación de pregrado por género - Arte y Arquitectura (2018-2023)</b>",
+      font = list(size = 13),
+      x = 0.5
+    ),
+    barmode = 'group',
+    xaxis = list(title = "", tickvals = 2018:2023),
+    yaxis = list(
+      title = ""),
+    separators = ".", 
+    legend = list(title = list(text = "<b>Género<br>")),
+    margin = list(t = 50),
+    hovermode = "closest"
+  )
+
+plot_titulados_aya
+
+#///////////////////////////////////////////////////////////////////////////////
+#Gráfico 19. Titulados ciencias básicas por género y total 2018-2023----
+titulados_ac_3 <- titulados_ac %>%
+  filter(area_del_conocimiento=="Ciencias Básicas")
+
+plot_titulados_cb <- plot_ly(titulados_ac_3, x = ~anio) %>%
+  add_bars(
+    y = ~titulados_mujeres,
+    name = "Femenino",
+    marker = list(color = "#8D69F3"),
+    hovertext = ~paste("Año:", anio, "<br>Femenino:", titulados_mujeres,
+                       "<br>Proporción:", prop_fem, "%"),
+    hoverinfo = "text"
+  ) %>%
+  add_bars(
+    y = ~titulados_hombres,
+    name = "Masculino",
+    marker = list(color = "#41776E"),
+    hovertext = ~paste("Año:", anio, "<br>Masculino:", titulados_hombres,
+                       "<br>Proporción:", prop_mas, "%"),
+    hoverinfo = "text"
+  ) %>%
+  add_trace(
+    y = ~total_titulados,
+    name = "Total",
+    type = "scatter",
+    mode = "lines+markers",
+    line = list(color = "black", width = 3),
+    marker = list(color = "black", size = 6),
+    hovertext = ~paste("Año:", anio, "<br>Total:", total_titulados),
+    hoverinfo = "text"
+  ) %>%
+  layout(
+    title = list(
+      text = "<b>Titulación de pregrado por género - Ciencias Básicas (2018-2023)</b>",
+      font = list(size = 13),
+      x = 0.5
+    ),
+    barmode = 'group',
+    xaxis = list(title = "", tickvals = 2018:2023),
+    yaxis = list(
+      title = ""),
+    separators = ".", 
+    legend = list(title = list(text = "<b>Género<br>")),
+    margin = list(t = 50),
+    hovermode = "closest"
+  )
+
+plot_titulados_cb
+
+#///////////////////////////////////////////////////////////////////////////////
+# Gráfico 20. Titulados ciencias sociales por género y total 2018-2023----
+titulados_ac_4 <- titulados_ac %>%
+  filter(area_del_conocimiento=="Ciencias Sociales")
+
+plot_titulados_cs <- plot_ly(titulados_ac_4, x = ~anio) %>%
+  add_bars(
+    y = ~titulados_mujeres,
+    name = "Femenino",
+    marker = list(color = "#8D69F3"),
+    hovertext = ~paste("Año:", anio, "<br>Femenino:", titulados_mujeres,
+                       "<br>Proporción:", prop_fem, "%"),
+    hoverinfo = "text"
+  ) %>%
+  add_bars(
+    y = ~titulados_hombres,
+    name = "Masculino",
+    marker = list(color = "#41776E"),
+    hovertext = ~paste("Año:", anio, "<br>Masculino:", titulados_hombres,
+                       "<br>Proporción:", prop_mas, "%"),
+    hoverinfo = "text"
+  ) %>%
+  add_trace(
+    y = ~total_titulados,
+    name = "Total",
+    type = "scatter",
+    mode = "lines+markers",
+    line = list(color = "black", width = 3),
+    marker = list(color = "black", size = 6),
+    hovertext = ~paste("Año:", anio, "<br>Total:", total_titulados),
+    hoverinfo = "text"
+  ) %>%
+  layout(
+    title = list(
+      text = "<b>Titulación de pregrado por género - Ciencias Sociales (2018-2023)</b>",
+      font = list(size = 13),
+      x = 0.5
+    ),
+    barmode = 'group',
+    xaxis = list(title = "", tickvals = 2018:2023),
+    yaxis = list(
+      title = ""),
+    separators = ".", 
+    legend = list(title = list(text = "<b>Género<br>")),
+    margin = list(t = 50),
+    hovermode = "closest"
+  )
+
+plot_titulados_cs
+
+#///////////////////////////////////////////////////////////////////////////////
+# Gráfico 21. Titulados derecho por género y total 2018-2023----
+titulados_ac_5 <- titulados_ac %>%
+  filter(area_del_conocimiento=="Derecho")
+
+plot_titulados_d <- plot_ly(titulados_ac_5, x = ~anio) %>%
+  add_bars(
+    y = ~titulados_mujeres,
+    name = "Femenino",
+    marker = list(color = "#8D69F3"),
+    hovertext = ~paste("Año:", anio, "<br>Femenino:", titulados_mujeres,
+                       "<br>Proporción:", prop_fem, "%"),
+    hoverinfo = "text"
+  ) %>%
+  add_bars(
+    y = ~titulados_hombres,
+    name = "Masculino",
+    marker = list(color = "#41776E"),
+    hovertext = ~paste("Año:", anio, "<br>Masculino:", titulados_hombres,
+                       "<br>Proporción:", prop_mas, "%"),
+    hoverinfo = "text"
+  ) %>%
+  add_trace(
+    y = ~total_titulados,
+    name = "Total",
+    type = "scatter",
+    mode = "lines+markers",
+    line = list(color = "black", width = 3),
+    marker = list(color = "black", size = 6),
+    hovertext = ~paste("Año:", anio, "<br>Total:", total_titulados),
+    hoverinfo = "text"
+  ) %>%
+  layout(
+    title = list(
+      text = "<b>Titulación de pregrado por género - Derecho (2018-2023)</b>",
+      font = list(size = 13),
+      x = 0.5
+    ),
+    barmode = 'group',
+    xaxis = list(title = "", tickvals = 2023),
+    yaxis = list(
+      title = ""),
+    separators = ".", 
+    legend = list(title = list(text = "<b>Género<br>")),
+    margin = list(t = 50),
+    hovermode = "closest"
+  )
+
+plot_titulados_d
+
+#///////////////////////////////////////////////////////////////////////////////
+# Gráfico 22. Titulados educación por género y total 2018-2023----
+titulados_ac_6 <- titulados_ac %>%
+  filter(area_del_conocimiento=="Educación")
+
+plot_titulados_ed <- plot_ly(titulados_ac_6, x = ~anio) %>%
+  add_bars(
+    y = ~titulados_mujeres,
+    name = "Femenino",
+    marker = list(color = "#8D69F3"),
+    hovertext = ~paste("Año:", anio, "<br>Femenino:", titulados_mujeres,
+                       "<br>Proporción:", prop_fem, "%"),
+    hoverinfo = "text"
+  ) %>%
+  add_bars(
+    y = ~titulados_hombres,
+    name = "Masculino",
+    marker = list(color = "#41776E"),
+    hovertext = ~paste("Año:", anio, "<br>Masculino:", titulados_hombres,
+                       "<br>Proporción:", prop_mas, "%"),
+    hoverinfo = "text"
+  ) %>%
+  add_trace(
+    y = ~total_titulados,
+    name = "Total",
+    type = "scatter",
+    mode = "lines+markers",
+    line = list(color = "black", width = 3),
+    marker = list(color = "black", size = 6),
+    hovertext = ~paste("Año:", anio, "<br>Total:", total_titulados),
+    hoverinfo = "text"
+  ) %>%
+  layout(
+    title = list(
+      text = "<b>Titulación de pregrado por género - Educación (2018-2023)</b>",
+      font = list(size = 13),
+      x = 0.5
+    ),
+    barmode = 'group',
+    xaxis = list(title = "", tickvals = 2018:2023),
+    yaxis = list(
+      title = ""),
+    separators = ".", 
+    legend = list(title = list(text = "<b>Género<br>")),
+    margin = list(t = 50),
+    hovermode = "closest"
+  )
+
+plot_titulados_ed
+
+#///////////////////////////////////////////////////////////////////////////////
+# Gráfico 23. Titulados humanidades por género y total 2018-2023----
+titulados_ac_7 <- titulados_ac %>%
+  filter(area_del_conocimiento=="Humanidades")
+
+plot_titulados_h <- plot_ly(titulados_ac_7, x = ~anio) %>%
+  add_bars(
+    y = ~titulados_mujeres,
+    name = "Femenino",
+    marker = list(color = "#8D69F3"),
+    hovertext = ~paste("Año:", anio, "<br>Femenino:", titulados_mujeres,
+                       "<br>Proporción:", prop_fem, "%"),
+    hoverinfo = "text"
+  ) %>%
+  add_bars(
+    y = ~titulados_hombres,
+    name = "Masculino",
+    marker = list(color = "#41776E"),
+    hovertext = ~paste("Año:", anio, "<br>Masculino:", titulados_hombres,
+                       "<br>Proporción:", prop_mas, "%"),
+    hoverinfo = "text"
+  ) %>%
+  add_trace(
+    y = ~total_titulados,
+    name = "Total",
+    type = "scatter",
+    mode = "lines+markers",
+    line = list(color = "black", width = 3),
+    marker = list(color = "black", size = 6),
+    hovertext = ~paste("Año:", anio, "<br>Total:", total_titulados),
+    hoverinfo = "text"
+  ) %>%
+  layout(
+    title = list(
+      text = "<b>Titulación de pregrado por género - Humanidades (2018-2023)</b>",
+      font = list(size = 13),
+      x = 0.5
+    ),
+    barmode = 'group',
+    xaxis = list(title = "", tickvals = 2018:2023),
+    yaxis = list(
+      title = ""),
+    separators = ".", 
+    legend = list(title = list(text = "<b>Género<br>")),
+    margin = list(t = 50),
+    hovermode = "closest"
+  )
+
+plot_titulados_h
+
+#///////////////////////////////////////////////////////////////////////////////
+# Gráfico 24. Titulados salud por género y total 2018-2023----
+titulados_ac_8 <- titulados_ac %>%
+  filter(area_del_conocimiento=="Salud")
+
+plot_titulados_s <- plot_ly(titulados_ac_8, x = ~anio) %>%
+  add_bars(
+    y = ~titulados_mujeres,
+    name = "Femenino",
+    marker = list(color = "#8D69F3"),
+    hovertext = ~paste("Año:", anio, "<br>Femenino:", titulados_mujeres,
+                       "<br>Proporción:", prop_fem, "%"),
+    hoverinfo = "text"
+  ) %>%
+  add_bars(
+    y = ~titulados_hombres,
+    name = "Masculino",
+    marker = list(color = "#41776E"),
+    hovertext = ~paste("Año:", anio, "<br>Masculino:", titulados_hombres,
+                       "<br>Proporción:", prop_mas, "%"),
+    hoverinfo = "text"
+  ) %>%
+  add_trace(
+    y = ~total_titulados,
+    name = "Total",
+    type = "scatter",
+    mode = "lines+markers",
+    line = list(color = "black", width = 3),
+    marker = list(color = "black", size = 6),
+    hovertext = ~paste("Año:", anio, "<br>Total:", total_titulados),
+    hoverinfo = "text"
+  ) %>%
+  layout(
+    title = list(
+      text = "<b>Titulación de pregrado por género - Salud (2018-2023)</b>",
+      font = list(size = 13),
+      x = 0.5
+    ),
+    barmode = 'group',
+    xaxis = list(title = "", tickvals = 2018:2023),
+    yaxis = list(
+      title = ""),
+    separators = ".", 
+    legend = list(title = list(text = "<b>Género<br>")),
+    margin = list(t = 50),
+    hovermode = "closest"
+  )
+
+plot_titulados_s
+
+#///////////////////////////////////////////////////////////////////////////////
+# Gráfico 25. Titulados tecnología por género y total 2018-2023----
+titulados_ac_9 <- titulados_ac %>%
+  filter(area_del_conocimiento=="Tecnología")
+
+plot_titulados_t <- plot_ly(titulados_ac_9, x = ~anio) %>%
+  add_bars(
+    y = ~titulados_mujeres,
+    name = "Femenino",
+    marker = list(color = "#8D69F3"),
+    hovertext = ~paste("Año:", anio, "<br>Femenino:", titulados_mujeres,
+                       "<br>Proporción:", prop_fem, "%"),
+    hoverinfo = "text"
+  ) %>%
+  add_bars(
+    y = ~titulados_hombres,
+    name = "Masculino",
+    marker = list(color = "#41776E"),
+    hovertext = ~paste("Año:", anio, "<br>Masculino:", titulados_hombres,
+                       "<br>Proporción:", prop_mas, "%"),
+    hoverinfo = "text"
+  ) %>%
+  add_trace(
+    y = ~total_titulados,
+    name = "Total",
+    type = "scatter",
+    mode = "lines+markers",
+    line = list(color = "black", width = 3),
+    marker = list(color = "black", size = 6),
+    hovertext = ~paste("Año:", anio, "<br>Total:", total_titulados),
+    hoverinfo = "text"
+  ) %>%
+  layout(
+    title = list(
+      text = "<b>Titulación de pregrado por género - Tecnología (2018-2023)</b>",
+      font = list(size = 13),
+      x = 0.5
+    ),
+    barmode = 'group',
+    xaxis = list(title = "", tickvals = 2018:2023),
+    yaxis = list(
+      title = ""),
+    separators = ".", 
+    legend = list(title = list(text = "<b>Género<br>")),
+    margin = list(t = 50),
+    hovermode = "closest"
+  )
+
+plot_titulados_t
